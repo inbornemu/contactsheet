@@ -1,11 +1,52 @@
-import { createHash } from 'node:crypto';
-import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { start } from './lib/server.mjs';
+import { run, validate } from './core.mjs';
+export * from './core.mjs';
+export const spec = { ...{
+  "slug": "contactsheet",
+  "repo": "contactsheet",
+  "owner": "inbornemu",
+  "title": "Contactsheet",
+  "purpose": "Group real photo uploads into a reviewable contact-sheet manifest",
+  "workflow": "A Kite content agent can buy image grouping and a selection manifest. Choices belong to the operator, and source images are not deleted.",
+  "colors": [
+    "#20201e",
+    "#f1eee5",
+    "#775d22"
+  ],
+  "required": [
+    "photos"
+  ],
+  "maxBytes": 8500000,
+  "sample": {
+    "photos": [],
+    "threshold": 6,
+    "splitPairs": [],
+    "decisions": {}
+  },
+  "changed": "Actual JPEG/PNG/WebP decoding, EXIF orientation, difference hashes, complete-linkage grouping, hash-backed identity and ID-based selection decisions.",
+  "limits": "Up to 40 images, 20 MP per image, 8 MB encoded input. Empty sample is a schema example; tests generate actual PNG fixtures. No face recognition, aesthetics scoring or image deletion.",
+  "version": "0.2.0",
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "photos"
+    ],
+    "properties": {
+      "photos": {
+        "type": "array"
+      },
+      "threshold": {
+        "type": "integer"
+      },
+      "splitPairs": {
+        "type": "array"
+      },
+      "decisions": {
+        "type": "object"
+      }
+    }
+  }
+}, run, validate };
+if (process.argv[1] === fileURLToPath(import.meta.url)) start(spec);
 
-function digest(value) { return createHash('sha256').update(String(value)).digest('hex'); }
-export function summarizePhotos(photos) { return photos.map(photo => ({ name: photo.name, hash: digest(photo.bytes), timeBucket: Math.floor(Number(photo.mtime) / 600000), bytes: Number(photo.bytes?.length ?? photo.size ?? 0) })); }
-export function groupPhotos(photos) { const summaries = summarizePhotos(photos); const groups = new Map(); for (const photo of summaries) { const key = `${photo.timeBucket}:${photo.hash.slice(0, 8)}`; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ ...photo, decision: '待选择' }); } return [...groups.entries()].map(([key, items], index) => ({ id: index + 1, key, items })); }
-export function decide(groups, decisions) { return groups.map(group => ({ ...group, items: group.items.map(item => ({ ...item, decision: decisions[item.name] ?? item.decision })) })); }
-
-function html() { return `<!doctype html><meta charset="utf-8"><title>镜选 · 活动照片初选</title><style>body{font:16px system-ui;margin:0;background:#20201e;color:#f1eee5}main{max-width:1000px;margin:auto;padding:32px}textarea{width:100%;min-height:190px;font:14px ui-monospace;padding:10px;box-sizing:border-box;background:#2c2b27;color:#f1eee5;border:1px solid #666}section{border:1px solid #555147;padding:18px;margin:16px 0}button{background:#d1b87c;color:#20201e;border:0;padding:10px 14px;border-radius:3px}pre{white-space:pre-wrap;background:#38362e;padding:12px}</style><main><p>镜选 / 活动照片初选</p><h1>保留选择权，只导出清单。</h1><p>首版只使用文件摘要与时间分组，不做人脸识别，不删除原片。</p><section><label>照片元数据 JSON<textarea id="photos">[{"name":"IMG_001.jpg","mtime":100000,"bytes":"scene-a"},{"name":"IMG_002.jpg","mtime":100100,"bytes":"scene-a"},{"name":"IMG_003.jpg","mtime":500000,"bytes":"scene-b"}]</textarea></label></section><button id="run">生成联系表分组</button><pre id="out">等待输入</pre></main><script>run.onclick=async()=>{const r=await fetch('/api/groups',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({photos:JSON.parse(photos.value)})});out.textContent=JSON.stringify(await r.json(),null,2)}</script>`; }
-if (process.argv[1] === fileURLToPath(import.meta.url)) createServer((req, res) => { if (req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(html()); return; } let body = ''; req.on('data', c => { body += c; }); req.on('end', () => { try { const input = JSON.parse(body); res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(groupPhotos(input.photos))); } catch (error) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: error.message })); } }); }).listen(process.env.PORT || 3000);
