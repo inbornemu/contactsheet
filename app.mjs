@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { start } from './lib/server.mjs';
 import { run, validate } from './core.mjs';
+import { product } from './project.mjs';
 export * from './core.mjs';
 export const spec = { ...{
   "slug": "contactsheet",
@@ -26,7 +27,7 @@ export const spec = { ...{
   },
   "changed": "Actual JPEG/PNG/WebP decoding, EXIF orientation, difference hashes, complete-linkage grouping, hash-backed identity and ID-based selection decisions.",
   "limits": "Up to 40 images, 20 MP per image, 8 MB encoded input. Empty sample is a schema example; tests generate actual PNG fixtures. No face recognition, aesthetics scoring or image deletion.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "inputSchema": {
     "type": "object",
     "required": [
@@ -47,6 +48,6 @@ export const spec = { ...{
       }
     }
   }
-}, run, validate };
+}, run, validate, product };
 if (process.argv[1] === fileURLToPath(import.meta.url)) start(spec);
 
